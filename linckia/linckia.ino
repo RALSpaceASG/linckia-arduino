@@ -14,19 +14,11 @@
 // Import the Arduino Servo library
 #include <Metro.h>
 
-int routeren = 2; //Digital pin 2 for enabling 3.3V regulator
+static const int routeren = 2; //Digital pin 2 for enabling 3.3V regulator
 
 // User commands over serial
-int command[6];                        // raw input from serial buffer, 6 bytes
-char data[8] = {255,0,0,0,0,0,0,254};
-int startbyte;                         // start byte, begin reading input
-int stopbyte;                          // end of command
-
-//Iterators and time
-int movtime;              //timed command value
-int i;                    // iterator command error check
-int j = 0;                // iterator (get feedback)
-int k;                    // iterator move joint
+byte command[6];                        // raw input from serial buffer, 6 bytes
+enum command_t {MOTOR = 1, SERVO, SENSOR, SENSOR_INTERVAL, PING, REBOOT, VERSION};
 
 //feedback
 int feedback;             // reading from analog port
@@ -73,93 +65,85 @@ void ReadAnalog(int targetPin){
   }
 }
 
-void CommandReceived(int command[6]){
-  // check each part of the command
-      //Return(command[0],command[1],command[2],command[3]);
-
-      //MOTOR COMMAND
-      if (command[0] == 1){
-        motor = command[1]; // 1-4
-        motordir = command[2]; //0 or 1
-        if (motordir == 1){
-          pwm = -command[3]; //-100 to 0
-        }
-        if (motordir == 0){
-          pwm = command[3]; // 0 to 100
-        }
-        movtime = ((command[4])*1000)+((command[5])*10); //milliseconds ??? WARNING THIS CAN BE HIGHER THAN 32767!rollover?
-
-        motorsdir[motor-1] = motordir;
-        motortargets[motor-1] = pwm;
-        motormovtimes[motor-1] = movtime;
-        //Return(103,motor,motordir,pwm);
+void CommandReceived(byte command[6]){
+  switch (command[0]) {
+    case MOTOR:
+      motor_command(command);
+      break;
+    case SERVO:
+      servo_command(command);
+      break;
+    case SENSOR:
+    {
+      analogpin = command[1];
+      ReadAnalog(analogpin);
+      break;
+    }
+    case SENSOR_INTERVAL:
+    {
+      //TODO Start stop readout
+      if (command[1] == 1) { //command for changeg feedback interval
+        mfeedon = command[2]; //turn it on if 1 turn it off if 0
+        //command[3] not used
+        mfeedint = (command[4]*100)+command[5];
+        motorfeedback.interval(mfeedint);
       }
-      //SERVO COMMAND
-      if (command[0] == 2){
-        servo = command[1]; // 1-3
-        pos = command[2]; // 0-180
-        movtime = ((command[4])*1000)+((command[5])*10); //milliseconds ??? WARNING THIS CAN BE HIGHER THAN 32767!rollover?
-
-        servotargets[servo-1] = pos;
-        servomovtimes[servo-1] = movtime;
-      }
-      //SENSOR direct command
-      if (command[0] == 3){
-        analogpin = command[1];
-        ReadAnalog(analogpin);
-      }
-
-      // automatic sensor interval command
-      if (command[0] == 4){
-        //TODO Start stop readout
-        if (command[1] == 1){ //command for changeg feedback interval
-          mfeedon = command[2]; //turn it on if 1 turn it off if 0
-          //command[3] not used
-          mfeedint = (command[4]*100)+command[5];
-          motorfeedback.interval(mfeedint);
-        }
-      }
-
-      //ping
-      if (command[0] == 5){
-        Return(104,0,0,0);
-      } // End of Handshake
-
-      //restart router
-      if (command[0] == 6){
-        digitalWrite(routeren, LOW);
-        delay(100);
-        digitalWrite(routeren, HIGH);
-      } // End of Handshake
-
-      // version information
-      if (command[0] == 7){
-        Serial.write(255);
-        Serial.println(LINCKIA_VERSION);
-        Serial.println(LINCKIA_VERSION_DATE);
-        Serial.println(__DATE__);
-        Serial.write(254);
-      }
+      break;
+    }
+    case PING:
+    {
+      Return(104,0,0,0);
+      break;
+    }
+    case REBOOT:
+    {
+      digitalWrite(routeren, LOW);
+      delay(100);
+      digitalWrite(routeren, HIGH);
+      break;
+    }
+    case VERSION:
+    {
+      Serial.write(255);
+      Serial.println(LINCKIA_VERSION);
+      Serial.println(LINCKIA_VERSION_DATE);
+      Serial.println(__DATE__);
+      Serial.write(254);
+      break;
+    }
+    default:
+    {
+      // invalid command
+      Return(103, command[0], 0, 0);
+      break;
+    }
+  }
 }
 
 void MoveActuators(){
   //Moves actuator by a calculated increment every 10 milliseconds
-  if (MMove.check() == 1){
+  if (MMove.check() == 1)
+  {
     moveServos();
     moveMotors();
   }
 }
 
-void CheckSensors(){
-  if (motorfeedback.check() == 1) { //time to check motor feedback
-    if(mfeedon == 1){ //if it is on 0 is off 1 is on
+void CheckSensors()
+{
+  if (motorfeedback.check() == 1) //time to check motor feedback
+  {
+    if(mfeedon == 1) //if it is on 0 is off 1 is on
+    {
+      static int j;
       ReadAnalog(j);
       j = j + 1;
-      if(j==5){
+      if(j == 5)
+      {
         j = 0;
       }
-    } //end of checking if it is on
-  } //end of metro check
+    }
+  }
 }
 
 void Return(int ID, int value, int value1, int value2){
@@ -175,14 +159,14 @@ void ReadSerial(){
   // Check serial input (min 8 bytes in buffer)
    if (Serial.available() > 7){
      // Read the first byte
-     startbyte = Serial.read();
+     byte startbyte = Serial.read();
      // If it's really the startbyte (255) ...
      if (startbyte == 255){
        // Read command
-       for (i=0;i<6;i++){
+       for (int i=0; i<6; i++){
          command[i] = Serial.read();
        }
-       stopbyte = Serial.read();
+       byte stopbyte = Serial.read();
        if (stopbyte == 254){
          //Return(command[0],command[1],command[2],command[3]);
          CommandReceived(command);
