@@ -8,7 +8,7 @@
  * ------------------------------
  */
 
-#define LINCKIA_VERSION "6.6"
+#define LINCKIA_VERSION "6.7"
 #define LINCKIA_VERSION_DATE "24 May 2016"
 
 // imports
@@ -20,7 +20,8 @@ typedef byte uint8_t;
 static const int routeren = 2; //Digital pin 2 for enabling 3.3V regulator
 
 // User commands over serial
-byte command[6];                        // raw input from serial buffer, 6 bytes
+byte command[6];                   // command from received serial packets
+byte return_packet_buffer[6];      // buffer to store return packets
 enum command_t {MOTOR = 1, SERVO, SENSOR, SENSOR_INTERVAL, PING, REBOOT, VERSION};
 
 //Metro objects for schedueled tasks
@@ -35,14 +36,29 @@ Metro MSensors   = Metro(ulSensorsInterval);
 Metro MCommandTimeout = Metro(LINCKIA_COMMAND_TIMEOUT);
 #endif
 
-void Return(int ID, int value, int value1, int value2) {
-  Serial.write(255);
-  Serial.write(ID);
-  Serial.write(value);
-  Serial.write(value1);
-  Serial.write(value2);
-  Serial.write(254);
+void makeReturnPacket(byte id, byte field2 = 0, byte field3 = 0, byte field4 = 0) {
+  return_packet_buffer[0] = 255;
+  return_packet_buffer[1] = id;
+  return_packet_buffer[2] = field2;
+  return_packet_buffer[3] = field3;
+  return_packet_buffer[4] = field4;
+  return_packet_buffer[5] = 254;
 }
+
+void sendReturnPacket() {
+  Serial.write(return_packet_buffer, 6);
+}
+
+void ReturnPacket(byte id, byte field2 = 0, byte field3 = 0, byte field4 = 0) {
+  makeReturnPacket(id, field2, field3, field4);
+  sendReturnPacket();
+}
+
+//**********************************
+//
+// Tasks to communicate with motors
+//
+//**********************************
 
 void StopAll() {
   MotorStopAll();
@@ -106,7 +122,7 @@ void HandleCommand(byte command[6]) {
     }
     case PING:
     {
-      Return(104,0,0,0);
+      ReturnPacket(104,0,0,0);
       break;
     }
     case REBOOT:
@@ -128,7 +144,7 @@ void HandleCommand(byte command[6]) {
     default:
     {
       // invalid command
-      Return(103, command[0], 0, 0);
+      ReturnPacket(103, command[0], 0, 0);
       break;
     }
   }
@@ -145,11 +161,13 @@ void setup() {
   pinMode(2, OUTPUT);
   digitalWrite(2, HIGH);
 
+  // Open the serial connection, max baud 115200
+  Serial.begin(115200);  // Command Serial port
+
+  // set up I/O
   ServoSetup();
   MotorSetup();
-  AnalogPinSetup();  //set up I/O
-  // Open the serial connection, baud 9600 (max: 115200)
-  Serial.begin(9600);
+  AnalogPinSetup();
 }
 
 void loop() {

@@ -25,7 +25,7 @@ void ReadAnalog(uint8_t targetPin) {
   byte feedback10  = feedback - feedback100*100;
   if (feedback100 < 100) {
    if (feedback10 < 100) {
-     Return(1,targetPin,feedback100,feedback10);
+     ReturnPacket(1,targetPin,feedback100,feedback10);
    }
  }
 }
