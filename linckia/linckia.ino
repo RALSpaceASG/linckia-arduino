@@ -31,8 +31,11 @@ int analogpin;            // variable for setting which analog pin to read
 int mfeedon;
 
 //Metro objects for schedueled tasks
-Metro MMotors = Metro(100);
-Metro MSensors = Metro(1000);
+unsigned long ulActuatorsInterval = 100;
+unsigned long ulSensorsInterval   = 1000;
+
+Metro MActuators = Metro(ulActuatorsInterval);
+Metro MSensors   = Metro(ulSensorsInterval);
 
 void Return(int ID, int value, int value1, int value2) {
   Serial.write(255);
@@ -148,8 +151,9 @@ void HandleCommand(byte command[6]) {
       if (command[1] == 1) { //command for changeg feedback interval
         mfeedon = command[2]; //turn it on if 1 turn it off if 0
         //command[3] not used
-        mfeedint = (command[4]*100)+command[5];
-        motorfeedback.interval(mfeedint);
+        ulSensorsInterval = (command[4]*100)+command[5];
+        MSensors.interval(ulSensorsInterval);
+        MSensors.reset();
       }
       break;
     }
@@ -191,7 +195,7 @@ void HandleCommand(byte command[6]) {
 
 void setup() {
   ServoSetup();
-  MotorCommand();
+  MotorSetup();
   PinSetup();  //set up I/O
   // Open the serial connection, baud 9600 (max: 115200)
   Serial.begin(9600);
@@ -203,7 +207,7 @@ void loop() {
     HandleCommand(command);
   }
 
-  if (MMotors.check()) {
+  if (MActuators.check()) {
     MoveActuators();
   }
 }
