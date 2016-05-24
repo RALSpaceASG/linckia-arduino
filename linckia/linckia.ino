@@ -34,7 +34,7 @@ int mfeedon;
 Metro MMotors = Metro(100);
 Metro MSensors = Metro(1000);
 
-void Return(int ID, int value, int value1, int value2){
+void Return(int ID, int value, int value1, int value2) {
   Serial.write(255);
   Serial.write(ID);
   Serial.write(value);
@@ -44,8 +44,7 @@ void Return(int ID, int value, int value1, int value2){
 }
 
 //USER DEFINED FUNCTIONS
-void PinSetup()
-{
+void PinSetup() {
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
@@ -63,7 +62,7 @@ void PinSetup()
   digitalWrite(2, HIGH);
 }
 
-void ReadAnalog(int targetPin){
+void ReadAnalog(int targetPin) {
   feedback = analogRead(targetPin);
   feedback100 = feedback/100;
   feedback10 = feedback-feedback100*100;
@@ -75,14 +74,13 @@ void ReadAnalog(int targetPin){
   }
 }
 
-void MoveActuators(){
+void MoveActuators() {
   //Moves actuator by a calculated increment every 10 milliseconds
   moveServos();
   moveMotors();
 }
 
-void CheckSensors()
-{
+void CheckSensors() {
   if (MSensors.check() == 1) //time to check motor feedback
   {
     if(mfeedon == 1) //if it is on 0 is off 1 is on
@@ -104,7 +102,7 @@ void CheckSensors()
 //
 //************************************//
 
-int ReadCommand(){
+int ReadCommand() {
   if (Serial.available() < 8) {
     return -1;
   }
@@ -130,13 +128,13 @@ int ReadCommand(){
   return 0;
 }
 
-void HandleCommand(byte command[6]){
+void HandleCommand(byte command[6]) {
   switch (command[0]) {
     case MOTOR:
-      motor_command(command);
+      MotorCommand(command);
       break;
     case SERVO:
-      servo_command(command);
+      ServoCommand(command);
       break;
     case SENSOR:
     {
@@ -187,20 +185,19 @@ void HandleCommand(byte command[6]){
 
 //********************************
 // ************MAIN***************
-// 
+//
 // Work is done here
 //********************************
 
 void setup() {
-  servo_setup();
-  motor_setup();
+  ServoSetup();
+  MotorCommand();
   PinSetup();  //set up I/O
   // Open the serial connection, baud 9600 (max: 115200)
   Serial.begin(9600);
 }
 
-void loop()
-{
+void loop() {
   int err = ReadCommand();
   if (!err) {
     HandleCommand(command);

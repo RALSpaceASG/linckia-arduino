@@ -16,14 +16,14 @@ int servotargets[3] = {90,90,0};                          //target position of s
 int servomovtimes[3] = {0,0,0};                           //time remaining to get to target position
 float servospeed;                                         //temporary value for servo speed calculation
 
-void servo_setup()
+void ServoSetup()
 {
   servo1.attach(3,  MIN_PULSE, MAX_PULSE); //attach servo 1 pwm to Digital pin 3
   servo2.attach(11, MIN_PULSE, MAX_PULSE); //attach servo 2 pwm to Digital pin 11
   servo3.attach(6,  MIN_PULSE, MAX_PULSE); //attach servo 3 pwm to Digital pin 6
 }
 
-void MoveServo(int servo, int pos){
+void servoMove(int servo, int pos){
   switch (servo) {
     case 1:
       servo1.write(pos);       // move servo1 to 'pos'
@@ -37,7 +37,7 @@ void MoveServo(int servo, int pos){
   }
 }
 
-void servo_command(byte command[6])
+void ServoCommand(byte command[6])
 {
   int servo = command[1] - 1; // 1-3
   servotargets[servo] = command[2]; // 0-180
@@ -53,14 +53,14 @@ void moveServos()
       if (servomovtimes[k] < moveint) //if command time is less than 100 milisecond
       {
         servos[k] = servotargets[k];
-        MoveServo(k+1,servos[k]); //move immediately
+        servoMove(k+1,servos[k]); //move immediately
         servomovtimes[k] = 0;
       } //end of if time is less than moveint milisecond
       else //else if time > moveint milisecond
       {
         servospeed = ((float)(servotargets[k] - servos[k])*moveint)/servomovtimes[k]; //calculated servo speed pwmchange/100ms
         servos[k] = servos[k]+ (int) (servospeed); // update servo matrix
-        MoveServo(k+1,servos[k]); // move servo at calculted speed for 10ms
+        servoMove(k+1,servos[k]); // move servo at calculted speed for 10ms
         servomovtimes[k] = servomovtimes[k]-moveint;
       }
     }

@@ -10,7 +10,7 @@ int motor_target[num_motors];     //target speed of motor
 int motor_dir[num_motors];         //direction of motor
 int motor_movtime[num_motors];    //time remaining to get to target speed
 
-void motor_setup()
+void MotorSetup()
 {
   for (int m = 0; m < num_motors; m++) {
     pinMode(motor_phase_pins[m], OUTPUT);
@@ -19,7 +19,7 @@ void motor_setup()
   }
 }
 
-void motor_command(byte command[6])
+void MotorCommand(byte command[6])
 {
   int motor = command[1] - 1; // 1-4
   motor_dir[motor] = command[2]; //0 or 1
@@ -27,7 +27,7 @@ void motor_command(byte command[6])
   motor_movtime[motor] = ((command[4])*1000)+((command[5])*10); //milliseconds ??? WARNING THIS CAN BE HIGHER THAN 32767!rollover?
 }
 
-void MoveMotor(int motor, int target)
+void moveMotor(int motor, int target)
 {
   byte pwm = abs(target);
   bool dir = (target < 0);
@@ -55,7 +55,7 @@ void moveMotors()
       if (motor_movtime[k] < moveint) //if command time is less than 100 milisecond
       {
         motor_current[k] = motor_target[k];
-        MoveMotor(k, motor_current[k]); // move motor immediatly
+        moveMotor(k, motor_current[k]); // move motor immediatly
         motor_movtime[k] = 0;
       } //end of if time is less than moveint milisecond
       else //else if time > moveint milisecond
@@ -63,7 +63,7 @@ void moveMotors()
         float motorspeed = ((float)(motor_target[k] - motor_current[k])*moveint)/motor_movtime[k]; //calculated motor speed pwmchange/100ms
         motor_current[k] += (int)motorspeed; // update motor matrix
 
-        MoveMotor(k, motor_current[k]); // move motor at calculted speed for 10ms
+        moveMotor(k, motor_current[k]); // move motor at calculted speed for 10ms
         motor_movtime[k] = motor_movtime[k] - moveint;
       }
     }
