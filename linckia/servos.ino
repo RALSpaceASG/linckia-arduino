@@ -37,7 +37,14 @@ void MoveServo(int servo, int pos){
   }
 }
 
-void MoveServos()
+void servo_command(byte command[6])
+{
+  int servo = command[1] - 1; // 1-3
+  servotargets[servo] = command[2]; // 0-180
+  servomovtimes[servo] = ((command[4])*1000)+((command[5])*10); //milliseconds ??? WARNING THIS CAN BE HIGHER THAN 32767!rollover?
+}
+
+void moveServos()
 {
   for (int k = 0; k < 3; k++) //cycle through pwm outputs
   {
