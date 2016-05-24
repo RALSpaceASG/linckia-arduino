@@ -8,11 +8,14 @@
  * ------------------------------
  */
 
-#define LINCKIA_VERSION "6.5"
-#define LINCKIA_VERSION_DATE "04 Apr 2016"
+#define LINCKIA_VERSION "6.6"
+#define LINCKIA_VERSION_DATE "24 May 2016"
 
 // Import the Arduino Servo library
 #include <Metro.h>
+
+// compatibility with Arduino < 1.6.7
+typedef byte uint8_t;
 
 static const int routeren = 2; //Digital pin 2 for enabling 3.3V regulator
 
@@ -25,13 +28,20 @@ int feedback;             // reading from analog port
 int feedback10;           // variable for storing first two digits of feedback
 int feedback100;          // variable for storing 100s decimal places of feedback
 int analogpin;            // variable for setting which analog pin to read
+int mfeedon;
 
 //Metro objects for schedueled tasks
-int moveint = 100;
-int mfeedon = 0;
-int mfeedint = 1000;
-Metro MMove = Metro(moveint);
-Metro motorfeedback = Metro(mfeedint);
+Metro MMotors = Metro(100);
+Metro MSensors = Metro(1000);
+
+void Return(int ID, int value, int value1, int value2){
+  Serial.write(255);
+  Serial.write(ID);
+  Serial.write(value);
+  Serial.write(value1);
+  Serial.write(value2);
+  Serial.write(254);
+}
 
 //USER DEFINED FUNCTIONS
 void PinSetup()
@@ -65,7 +75,62 @@ void ReadAnalog(int targetPin){
   }
 }
 
-void CommandReceived(byte command[6]){
+void MoveActuators(){
+  //Moves actuator by a calculated increment every 10 milliseconds
+  moveServos();
+  moveMotors();
+}
+
+void CheckSensors()
+{
+  if (MSensors.check() == 1) //time to check motor feedback
+  {
+    if(mfeedon == 1) //if it is on 0 is off 1 is on
+    {
+      static int j;
+      ReadAnalog(j);
+      j = j + 1;
+      if(j == 5)
+      {
+        j = 0;
+      }
+    }
+  }
+}
+
+//************************************
+// Get packets through Serial and
+// execute commands based on payload
+//
+//************************************//
+
+int ReadCommand(){
+  if (Serial.available() < 8) {
+    return -1;
+  }
+
+  if (Serial.read() != 255) {
+    // seek to a startbyte
+    while (Serial.available() >= 8 && Serial.read() != 255);
+    // or else leave
+    if (Serial.available() < 8) {
+      return -2;
+    }
+  }
+
+  Serial.readBytes(command, 6);
+
+  if (Serial.read() != 254) {
+    // error wrong stopbyte
+    return -2;
+  }
+
+  // if we have reached here it means
+  // we have a valid command packet
+  return 0;
+}
+
+void HandleCommand(byte command[6]){
   switch (command[0]) {
     case MOTOR:
       motor_command(command);
@@ -120,71 +185,11 @@ void CommandReceived(byte command[6]){
   }
 }
 
-void MoveActuators(){
-  //Moves actuator by a calculated increment every 10 milliseconds
-  if (MMove.check() == 1)
-  {
-    moveServos();
-    moveMotors();
-  }
-}
-
-void CheckSensors()
-{
-  if (motorfeedback.check() == 1) //time to check motor feedback
-  {
-    if(mfeedon == 1) //if it is on 0 is off 1 is on
-    {
-      static int j;
-      ReadAnalog(j);
-      j = j + 1;
-      if(j == 5)
-      {
-        j = 0;
-      }
-    }
-  }
-}
-
-void Return(int ID, int value, int value1, int value2){
-  Serial.write(255);
-  Serial.write(ID);
-  Serial.write(value);
-  Serial.write(value1);
-  Serial.write(value2);
-  Serial.write(254);
-}
-
-void ReadSerial(){
-  // Check serial input (min 8 bytes in buffer)
-   if (Serial.available() > 7){
-     // Read the first byte
-     byte startbyte = Serial.read();
-     // If it's really the startbyte (255) ...
-     if (startbyte == 255){
-       // Read command
-       for (int i=0; i<6; i++){
-         command[i] = Serial.read();
-       }
-       byte stopbyte = Serial.read();
-       if (stopbyte == 254){
-         //Return(command[0],command[1],command[2],command[3]);
-         CommandReceived(command);
-       } //end of accept command
-       else{
-         //Error wrong Stopbyte
-         Return(102,stopbyte,0,0);
-         //Reject or accept command, debug ???
-       } //end of stopbyte check
-    } //end of accept startbyte
-     else{
-       //Error wrong Startbyte
-       Return(101,startbyte,0,0);
-     } //end of reject startbyte
-  } //end if serial.available
-}
-
-//ARDUINO SETUP and LOOP functions
+//********************************
+// ************MAIN***************
+// 
+// Work is done here
+//********************************
 
 void setup() {
   servo_setup();
@@ -196,6 +201,12 @@ void setup() {
 
 void loop()
 {
-  ReadSerial();
-  MoveActuators();
+  int err = ReadCommand();
+  if (!err) {
+    HandleCommand(command);
+  }
+
+  if (MMotors.check()) {
+    MoveActuators();
+  }
 }
