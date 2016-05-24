@@ -30,6 +30,11 @@ unsigned long ulSensorsInterval   = 1000;
 Metro MActuators = Metro(ulActuatorsInterval);
 Metro MSensors   = Metro(ulSensorsInterval);
 
+#ifdef LINCKIA_COMMAND_TIMEOUT
+// Metro to check that we receive commands regularly
+Metro MCommandTimeout = Metro(LINCKIA_COMMAND_TIMEOUT);
+#endif
+
 void Return(int ID, int value, int value1, int value2) {
   Serial.write(255);
   Serial.write(ID);
@@ -37,6 +42,10 @@ void Return(int ID, int value, int value1, int value2) {
   Serial.write(value1);
   Serial.write(value2);
   Serial.write(254);
+}
+
+void StopAll() {
+  MotorStopAll();
 }
 
 void MoveActuators() {
@@ -147,9 +156,20 @@ void loop() {
   int err = ReadCommand();
   if (!err) {
     HandleCommand(command);
+#ifdef LINCKIA_COMMAND_TIMEOUT
+    MCommandTimeout.reset();
+#endif
   }
 
   if (MActuators.check()) {
     MoveActuators();
   }
+
+#ifdef LINCKIA_COMMAND_TIMEOUT
+  // this will be true if we haven't
+  // been resetting often enough
+  if (MCommandTimeout.check()) {
+    StopAll();
+  }
+#endif
 }
