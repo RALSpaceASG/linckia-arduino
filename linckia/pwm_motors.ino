@@ -9,6 +9,12 @@ int motor_current[num_motors]; //speed of motor pwm line
 int motor_target[num_motors];  //target speed of motor
 int motor_movtime[num_motors]; //time remaining to get to target speed
 
+void MotorStopAll() {
+  for (int m = 0; m < num_motors; m++) {
+    SoftPWMSetPercent(motor_enpwm_pins[m], 0);
+  }
+}
+
 void MotorSetup() {
   for (int m = 0; m < num_motors; m++) {
     pinMode(motor_phase_pins[m], OUTPUT);
